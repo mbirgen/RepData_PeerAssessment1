@@ -1,0 +1,112 @@
+---
+title: "RepData_PeerAssessment1 Notebook"
+output: html_notebook
+---
+
+
+1.  Load the data (i.e. \color{red}{\verb|read.csv()|}read.csv())
+2.  Process/transform the data (if necessary) into a format suitable for your analysis
+```{r}
+library(lubridate, dplyr, ggplot2)
+activity <- read.csv(unz("activity.zip", "activity.csv"), header = TRUE, stringsAsFactors = FALSE)
+activity1 <- activity %>% mutate(date2 = ymd(date)) %>% group_by(date2)
+tsteps <- activity1 %>% summarize(totalsteps = sum(steps, na.rm=TRUE))
+```
+
+### What is mean total number of steps taken per day?
+
+For this part of the assignment, you can ignore the missing values in the dataset.
+
+1.  Calculate the total number of steps taken per day
+
+    If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+```{r}
+qplot(totalsteps, data = tsteps, geom = "histogram", bins = 40)
+```
+
+2.  Calculate and report the mean and median of the total number of steps taken per day
+```{r}
+summary(tsteps$totalsteps)
+omedian <- median(tsteps$totalsteps)
+omean <- mean(tsteps$totalsteps)
+```
+The meadian total steps per day is `r omedian` and the mean total steps per day is `r omean`.
+
+### What is the average daily activity pattern?
+1.  Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+msteps <- activity %>% group_by(interval) %>% 
+    mutate(meansteps = mean(steps,na.rm=TRUE)) %>%
+    summarize(mean = mean(steps, na.rm=TRUE))
+qplot(interval, mean, data = msteps, geom="line")
+```
+
+
+1.  Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+meaninterval <- msteps[which.max(msteps$mean),1]
+```
+The 5-minute interval that contains the maximum number of steps starts with `r meaninterval[[1]]`.
+
+### Imputing missing values
+Note that there are a number of day equal to NA. The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+1.  Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r}
+totalNA <-sum(is.na(activity$steps))
+sum(is.na(activity$date))
+sum(is.na(activity$interval))
+```
+The number of missing values in the dataset is `r totalNA`. There are no missing values in the other columns.
+
+2.  Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+It makes most sense to use the mean for the 5-minute interval as we have already calculated that.
+
+3.  Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+activity2 <- activity %>% mutate(date2 = ymd(date), ) %>%    mutate(meansteps = mean(steps,na.rm=TRUE))
+activity2$steps[is.na(activity$steps)] <- activity2$meansteps[is.na(activity$steps)]
+```
+
+
+4.  Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r}
+activity2 <- activity2 %>% group_by(date2)
+tsteps2 <- activity2 %>% summarize(totalsteps = sum(steps))
+qplot(totalsteps, data = tsteps2, geom='histogram', bins=40)
+```
+
+```{r}
+dmean <- mean(activity2$steps)
+dmedian <- median(activity2$steps)
+```
+The new mean number of steps per day is `r dmean`. The new median number of steps per day is `r dmedian`.
+
+To consider the impact of immuting the data, we will plot both histograms on top of each other.
+```{r}
+# We need to combine both data sets using a factor to clarify where the information is coming from.
+tsteps <- activity1 %>% summarize(totalsteps = sum(steps, na.rm=TRUE))
+tsteps <- mutate(tsteps, DB = "Original")
+tsteps2 <- mutate(tsteps2, DB = "Immuted")
+bothsteps <- rbind(tsteps, tsteps2)
+qplot(totalsteps, data = bothsteps, geom = "histogram", colour = DB, fill = DB, bins=40)
+```
+It appears that there is no difference in the two data frames except when the total number of steps is zero. In this case the total number of steps being zero goes down in the Immuted data.  This can also be seen in the mean and median values which both go down.  The original mean was `r omean` and immuted mean is `r dmean`.  The orignal median was `r omedian` and the immuted median is `r dmedian`.
+
+## Are there differences in activity patterns between weekdays and weekends?
+For this part the \color{red}{\verb|weekdays()|}weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+1.  Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+activity2 <- activity2 %>% mutate(wday = factor( ifelse(wday(date2)==1|wday(date2)==7, "weekend", "weekday")))
+```
+
+2.  Make a panel plot containing a time series plot (i.e. \color{red}{\verb|type = "l"|}type="l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+```{r}
+pdata <- activity2 %>% group_by(wday, interval) %>%
+    summarize(meansteps = mean(steps))
+qplot(interval, meansteps, data = pdata, color = wday, geom="line")
+```
+
